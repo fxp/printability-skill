@@ -58,6 +58,8 @@ python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
+The [value demonstration suite](VALUE_CASES.md) contains ten acceptance cases that show why geometry-only checks are insufficient. The same cases are available in machine-readable form at [`evals/value-cases.yaml`](evals/value-cases.yaml).
+
 ## Hi3D research note
 
 The functional-intent taxonomy in [`references/functional-intent-routes.md`](references/functional-intent-routes.md) was informed by public descriptions in the [Hi3D Agent 3D Printing category](https://www.hi3d.ai/agent?category=3d-printing), reviewed on 2026-10-28. It does not reproduce or claim access to Hi3D's internal prompts, implementation, or validation criteria. This project is not affiliated with or endorsed by Hi3D.
