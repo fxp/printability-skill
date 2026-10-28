@@ -23,7 +23,10 @@ class AuditMeshTests(unittest.TestCase):
             text=True,
         )
         self.assertTrue(result.stdout, result.stderr)
-        return result.returncode, json.loads(result.stdout)
+        report = json.loads(result.stdout)
+        if result.returncode == 2:
+            self.fail(report.get("error", "mesh auditor returned an input/runtime error"))
+        return result.returncode, report
 
     def test_closed_solid_passes_static_gate_but_not_function(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
