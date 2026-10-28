@@ -1,0 +1,6 @@
+interface:
+  display_name: "Printability"
+  short_description: "区分 3D 模型的几何、工艺、功能、质量风险与验证层级"
+  default_prompt: "Use $printability to audit this 3D model and separate geometry blockers, process feasibility, functional validation, and quality risks."
+policy:
+  allow_implicit_invocation: true
