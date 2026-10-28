@@ -1,0 +1,231 @@
+version: 1
+suite: printability-value-cases
+purpose: Demonstrate decisions that a geometry-only checker cannot make safely.
+evidence_scope: Evidence level records validation completed for the target model; external calibration may support a decision without promoting the target model to physical evidence.
+
+status_vocabulary:
+  geometry_gate: [pass, fail, unknown]
+  process_feasibility: [pass, fail, conditional, unknown]
+  functional_validation: [pass, fail, conditional, not_applicable, unknown]
+  quality_risk: [low, medium, high, unknown]
+  evidence_level: [static, source, sliced, physical]
+
+global_acceptance:
+  - Do not output a combined printability score.
+  - Do not claim that static geometry success proves printable or functional success.
+  - Preserve every hard blocker and unknown.
+  - State the evidence, impact, and smallest next validation step.
+  - Do not upload, slice remotely, or operate hardware without explicit authorization.
+
+cases:
+  - id: PRT-001
+    title: Clean closed cube remains unvalidated beyond geometry
+    layer: automated-auditor
+    automation_tests:
+      - test_closed_solid_passes_static_gate_but_not_function
+    prompt: >-
+      Review a watertight 20 x 10 x 5 mm STL cube as an FDM solid. Only the STL is available.
+    expected_axes:
+      geometry_gate: pass
+      process_feasibility: unknown
+      functional_validation: unknown
+      quality_risk: unknown
+      evidence_level: static
+    must_include:
+      - Static success only permits progression to slicer validation.
+      - Machine, material, orientation, and functional requirements are not validated.
+    must_not_claim:
+      - The part is printable.
+      - The part will work.
+    value: Prevents a valid mesh from being mistaken for a validated manufacturing outcome.
+
+  - id: PRT-002
+    title: Open mesh depends on declared geometry intent
+    layer: automated-auditor
+    automation_tests:
+      - test_open_solid_fails_watertight_gate
+      - test_open_surface_is_allowed_conditionally
+    prompt: >-
+      Review the same open lampshade mesh first as a closed solid, then as a surface intended for explicit single-wall slicing.
+    variants:
+      - name: closed-solid-intent
+        expected_axes:
+          geometry_gate: fail
+          process_feasibility: unknown
+          functional_validation: unknown
+          quality_risk: unknown
+          evidence_level: static
+      - name: explicit-surface-intent
+        expected_axes:
+          geometry_gate: pass
+          process_feasibility: unknown
+          functional_validation: unknown
+          quality_risk: unknown
+          evidence_level: static
+    must_include:
+      - The solid interpretation fails because the intended volume is open.
+      - The surface interpretation may pass the static gate but requires matching slicer mode.
+    must_not_claim:
+      - Every open mesh is invalid.
+      - Open boundaries are harmless for a solid.
+    value: Proves that watertightness is contextual rather than an unconditional checkbox.
+
+  - id: PRT-003
+    title: Multipart kit contains one accidental fragment
+    layer: automated-auditor
+    automation_tests:
+      - test_unexpected_fragment_fails_declared_shell_count
+    prompt: >-
+      Review a four-part kit that contains four intended watertight shells and one tiny disconnected fragment.
+    expected_axes:
+      geometry_gate: fail
+      process_feasibility: unknown
+      functional_validation: unknown
+      quality_risk: unknown
+      evidence_level: static
+    must_include:
+      - The expected shell count is four but the observed count is five.
+      - Multiple shells without declared intent are a review item, not an automatic failure.
+    must_not_claim:
+      - Multipart models are invalid.
+    value: Separates legitimate assemblies from export debris.
+
+  - id: PRT-004
+    title: Reversed face winding differs from broken smoothing normals
+    layer: manual-skill-acceptance
+    prompt: >-
+      Compare a closed solid with all triangle winding reversed against a geometrically valid solid with broken custom smoothing normals.
+    variants:
+      - name: reversed-triangle-winding
+        expected_axes:
+          geometry_gate: fail
+          process_feasibility: unknown
+          functional_validation: unknown
+          quality_risk: unknown
+          evidence_level: static
+      - name: broken-smoothing-normals
+        expected_axes:
+          geometry_gate: pass
+          process_feasibility: unknown
+          functional_validation: unknown
+          quality_risk: unknown
+          evidence_level: static
+    must_include:
+      - Reversed winding changes inside and outside semantics or signed volume.
+      - Custom smoothing normals usually affect preview rather than triangle positions.
+    must_not_claim:
+      - Both variants have the same print blocker.
+    value: Rejects a real solid-orientation defect without rejecting harmless render metadata.
+
+  - id: PRT-005
+    title: Axis-aligned rotation recovers build-volume fit
+    layer: automated-auditor
+    automation_tests:
+      - test_rotation_can_recover_build_volume_fit
+    prompt: >-
+      Check a 250 x 280 x 10 mm part against a 256 x 256 x 300 mm build volume when axis-aligned rotation is allowed.
+    expected_axes:
+      geometry_gate: pass
+      process_feasibility: unknown
+      functional_validation: unknown
+      quality_risk: unknown
+      evidence_level: static
+    must_include:
+      - The current orientation does not fit.
+      - The 250 x 10 x 280 mm permutation fits.
+    must_not_claim:
+      - The part is too large for the machine.
+    value: Avoids a false blocker caused by evaluating only the imported orientation.
+
+  - id: PRT-006
+    title: Watertight hollow resin shell has no drain path
+    layer: manual-skill-acceptance
+    prompt: >-
+      Review a watertight hollow resin figurine with a completely closed internal cavity and no drain or vent openings.
+    expected_axes:
+      geometry_gate: pass
+      process_feasibility: fail
+      functional_validation: unknown
+      quality_risk: high
+      evidence_level: source
+    must_include:
+      - Trapped resin, suction, cleaning, and curing risks.
+      - Drain and vent connectivity must be reviewed in the intended orientation.
+    must_not_claim:
+      - Watertight means resin-ready.
+    value: Exposes process blockers invisible to a manifold-only check.
+
+  - id: PRT-007
+    title: Watertight bottle and cap use incompatible threads
+    layer: manual-skill-acceptance
+    prompt: >-
+      Review a watertight bottle and cap whose internal and external threads have different pitches and zero assembly clearance.
+    expected_axes:
+      geometry_gate: pass
+      process_feasibility: unknown
+      functional_validation: fail
+      quality_risk: high
+      evidence_level: source
+    must_include:
+      - Route the model through threaded-closure checks.
+      - Compare pitch, direction, engagement, lead-in, stop, and clearance.
+    must_not_claim:
+      - Both parts slice, so the assembly passes.
+    value: Separates printable objects from a working product.
+
+  - id: PRT-008
+    title: Requested relief exists only in a normal map
+    layer: manual-skill-acceptance
+    prompt: >-
+      Review a phone case whose preview shows raised artwork, but the mesh is smooth and the artwork exists only in material and normal-map data.
+    expected_axes:
+      geometry_gate: pass
+      process_feasibility: unknown
+      functional_validation: fail
+      quality_risk: high
+      evidence_level: source
+    must_include:
+      - Route the model through relief-surface checks.
+      - A raised-relief requirement must be converted to actual displaced geometry.
+    must_not_claim:
+      - Visible preview detail will print as raised geometry.
+    value: Prevents render-only detail from being confused with manufactured surface geometry.
+
+  - id: PRT-009
+    title: Sliceable print-in-place hinge is below calibrated clearance
+    layer: manual-skill-acceptance
+    supporting_evidence:
+      - A physical calibration coupon established the machine and material clearance limit, but the target hinge itself has not been printed.
+    prompt: >-
+      Review an FDM print-in-place hinge with 0.10 mm clearance when calibration for the exact machine and material shows a 0.30 mm minimum moving clearance.
+    expected_axes:
+      geometry_gate: pass
+      process_feasibility: conditional
+      functional_validation: fail
+      quality_risk: high
+      evidence_level: source
+    must_include:
+      - Route the model through motion-joint checks.
+      - Calibrated machine and material evidence overrides a generic clearance rule.
+    must_not_claim:
+      - Successful slicing proves that the hinge will release.
+    value: Demonstrates why functional evidence must remain separate from slicer success.
+
+  - id: PRT-010
+    title: Unitless STL cannot be scaled safely
+    layer: manual-skill-acceptance
+    prompt: >-
+      Review an STL with a 1 x 1 x 1 coordinate box when neither the unit nor a trusted expected dimension is available.
+    expected_axes:
+      geometry_gate: unknown
+      process_feasibility: unknown
+      functional_validation: unknown
+      quality_risk: unknown
+      evidence_level: static
+    must_include:
+      - Request an explicit unit or a trusted known dimension.
+      - Explain the risk of a 25.4x scale error.
+    must_not_claim:
+      - The coordinates are millimetres.
+      - The coordinates are inches.
+    value: Stops a common scale failure before slicing or printing.
